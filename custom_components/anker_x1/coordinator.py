@@ -14,9 +14,10 @@ Block C  read_input_registers(10156, count=60)  → addresses 10156-10215
 Block D  read_input_registers(10750, count=8)   → addresses 10750-10757  (serial, read once)
 Block E  read_holding_registers(10060, count=21) → addresses 10060-10080  (work_mode, export/import power limit control)
 Block H  read_input_registers(10253, count=1)   → address  10253          (battery pack voltage)
+Block P  read_input_registers(10254, count=2)   → addresses 10254-10255  (battery pack power, read-only diagnostic)
 Block M  read_input_registers(10620, count=47)  → addresses 10620-10666  (external meter)
 
-Blocks D, H and M are optional: not every model implements them. They go
+Blocks D, H, P and M are optional: not every model implements them. They go
 through `read_optional`. At a 1 s scan interval, re-probing a dead register
 burns a full retry/timeout cycle on every poll, so a block that keeps quiet is
 disabled — but only after repeated CONSECUTIVE timeouts, and it is re-probed
@@ -323,6 +324,13 @@ class AnkerX1Coordinator(DataUpdateCoordinator[dict[str, Any]]):
             h = await self._read_optional_block("H", 10253, 1)  # index 0 = address 10253
 
             # ----------------------------------------------------------
+            # Block P: battery pack power 10254-10255 (i32, W). Own optional
+            # block, not folded into H: a unit without it must not lose the
+            # pack voltage. Read-only diagnostic (kw44.3).
+            # ----------------------------------------------------------
+            p = await self._read_optional_block("P", 10254, 2)  # index 0 = address 10254
+
+            # ----------------------------------------------------------
             # Block M: input registers 10620-10666 (count=47) — external
             # CHINT 3-phase meter. Optional read (like Block H): not every
             # unit has a meter connected, so a failure here must not sink
@@ -344,8 +352,9 @@ class AnkerX1Coordinator(DataUpdateCoordinator[dict[str, Any]]):
             # 3rd-party PV, W; feeds total_pv for the inverter_loss balance below;
             # not exposed as a sensor)
             third_party_pv: int = decode_i32_le(a[4:6])
-            # 10006-10007  ac_active_power  i32  (internal only -- feeds the
-            # AC-coupled charge-power correction below; not exposed as a sensor)
+            # 10006-10007  ac_active_power  i32  (+ X1 delivers AC / - X1 draws AC;
+            # feeds the AC-coupled charge-power correction below and, since
+            # kw44.3, exposed raw as a diagnostic sensor)
             ac_active_power: int = decode_i32_le(a[6:8])
             # 10008-10009  battery_power  i32  (+ discharge / - charge)
             battery_power: int = decode_i32_le(a[8:10])
@@ -461,6 +470,11 @@ class AnkerX1Coordinator(DataUpdateCoordinator[dict[str, Any]]):
                 decode_u16(h[0]) / 10.0 if h else None
             )
 
+            # 10254-10255 battery_pack_power i32 (W) = p[0:2], scale 1 as in
+            # the maker's tools/dashboard.py. Exposed raw: sign and scale are
+            # verified against battery_power and the SoC slope, not assumed.
+            battery_pack_power: int | None = decode_i32_le(p[0:2]) if p else None
+
             # ----------------------------------------------------------
             # Decode Block M (base address 10620) — external meter.
             # Official layout (spec V1.0.0): 10620-10629 = meter model
@@ -554,6 +568,12 @@ class AnkerX1Coordinator(DataUpdateCoordinator[dict[str, Any]]):
             "charge_power": max(0, -battery_power),
             "discharge_power": max(0, battery_power),
             "inverter_loss": inverter_loss,
+            # Raw AC active power of the PCS (10006, W), before any correction.
+            # + = the X1 delivers AC (to house/grid), - = the X1 draws AC
+            # (charging, or its own consumption from the grid). Same sign the
+            # inverter_loss balance above relies on (pv + battery - ac).
+            "ac_active_power": ac_active_power,
+            "battery_pack_power": battery_pack_power,
             "backup_power": backup_power,
             "rechargeable_power": rechargeable_power,
             "dischargeable_power": dischargeable_power,

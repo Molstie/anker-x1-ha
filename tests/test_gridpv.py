@@ -270,13 +270,15 @@ def test_usable_pv_power_uses_total_pv_power_register():
     assert descriptions["usable_pv_power"]["state_class"] == "SensorStateClass.MEASUREMENT"
 
 
-def test_ac_active_power_not_exposed_as_sensor_or_return_key():
-    # ac_active_power sensor was removed, but the underlying register is kept
-    # as an internal-only decode (see next test) -- it still feeds the
-    # AC-coupled charge-power correction.
+def test_ac_active_power_exposed_as_diagnostic_sensor():
+    # Upstream removed the ac_active_power sensor in its cleanup. The kw44 fork
+    # (kw44.3) exposes it again as a read-only DIAGNOSTIC sensor with the raw
+    # register value, to see whether the X1 draws its own consumption from the
+    # grid while held at 0 W. The internal decode still feeds the AC-coupled
+    # charge-power correction (see next test).
     descriptions = _load_descriptions_tuple("NUMERIC_SENSOR_DESCRIPTIONS")
-    assert "ac_active_power" not in descriptions
-    assert "ac_active_power" not in _load_coordinator_return_keys()
+    assert descriptions["ac_active_power"]["entity_category"] == "EntityCategory.DIAGNOSTIC"
+    assert "ac_active_power" in _load_coordinator_return_keys()
 
 
 def test_ac_active_power_still_decoded_internally_for_charge_correction():

@@ -83,6 +83,8 @@ device page.
 | --- | --- | --- |
 | `soc` / `soh` | % | state of charge / health (SOH is diagnostic) |
 | `battery_pack_voltage` | V | pack DC voltage (reg 10253; unavailable if unimplemented) |
+| `battery_pack_power` | W | pack DC power, raw (reg 10254, i32; diagnostic, kw44 fork; unavailable if unimplemented) |
+| `ac_active_power` | W | raw PCS AC power (reg 10006; **+ X1 delivers AC / − X1 draws AC**; diagnostic, kw44 fork) |
 | `battery_module_count` | — | installed 5 kWh modules (diagnostic) |
 | `battery_nominal_capacity` | kWh | `battery_module_count` × 5 kWh (diagnostic) |
 | `inverter_temperature` | °C | diagnostic |

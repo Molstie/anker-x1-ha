@@ -80,6 +80,25 @@ NUMERIC_SENSOR_DESCRIPTIONS: tuple[AnkerX1SensorEntityDescription, ...] = (
         state_class=SensorStateClass.MEASUREMENT,
         entity_category=EntityCategory.DIAGNOSTIC,
     ),
+    # Read-only diagnostics (kw44.3): raw PCS AC power (10006) and battery
+    # pack power (10254). Sign of ac_active_power: + = X1 delivers AC,
+    # - = X1 draws AC. Enabled by default.
+    AnkerX1SensorEntityDescription(
+        key="ac_active_power",
+        name="AC Active Power",
+        native_unit_of_measurement=UnitOfPower.WATT,
+        device_class=SensorDeviceClass.POWER,
+        state_class=SensorStateClass.MEASUREMENT,
+        entity_category=EntityCategory.DIAGNOSTIC,
+    ),
+    AnkerX1SensorEntityDescription(
+        key="battery_pack_power",
+        name="Battery Pack Power",
+        native_unit_of_measurement=UnitOfPower.WATT,
+        device_class=SensorDeviceClass.POWER,
+        state_class=SensorStateClass.MEASUREMENT,
+        entity_category=EntityCategory.DIAGNOSTIC,
+    ),
     AnkerX1SensorEntityDescription(
         key="backup_power",
         name="Backup Power",
