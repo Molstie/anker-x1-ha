@@ -281,7 +281,7 @@ def test_ac_active_power_exposed_as_diagnostic_sensor():
     assert "ac_active_power" in _load_coordinator_return_keys()
 
 
-def test_ac_active_power_still_decoded_internally_for_charge_correction():
+def test_ac_active_power_still_decoded_internally():
     assignments = _load_assignment_sources()
     assert assignments.get("ac_active_power") == "decode_i32_le(a[6:8])"
 
@@ -293,21 +293,15 @@ def test_ac_active_power_decode_offset_matches_register_10006_10007():
     assert modbus_client.decode_i32_le(a[6:8]) == -500
 
 
-def test_ac_coupled_charge_power_correction_still_applied():
-    # The AC-coupled (pv_connected=False) charge-power correction is
-    # independent of the inverter_loss balance -- verify the coordinator
-    # source still contains it, guarded on `not self.pv_connected`.
+def test_battery_power_is_not_averaged_with_ac_active_power():
+    # kw44.4: register 10006 measures no power on this firmware (test
+    # 2026-10-25), so the AC-coupled charge correction is gone.
     source = _load_coordinator_source()
-    assert "not self.pv_connected and battery_power < 0" in source
-    assert (
-        "-round(\n                    (abs(battery_power) + abs(ac_active_power)) / 2\n                )"
-        in source
-        or "abs(battery_power) + abs(ac_active_power)" in source
-    )
+    assert "abs(battery_power) + abs(ac_active_power)" not in source
+    assert "not self.pv_connected and battery_power < 0" not in source
 
 
-def test_ac_coupled_charge_power_correction_math():
-    battery_power = -300  # charging
-    ac_active_power = -200
-    corrected = -round((abs(battery_power) + abs(ac_active_power)) / 2)
-    assert corrected == -250
+def test_battery_power_is_assigned_only_from_the_register():
+    source = _load_coordinator_source()
+    assert source.count("battery_power = ") == 0
+    assert source.count("battery_power: int = decode_i32_le(a[8:10])") == 1

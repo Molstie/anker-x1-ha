@@ -353,10 +353,13 @@ class AnkerX1Coordinator(DataUpdateCoordinator[dict[str, Any]]):
             # not exposed as a sensor)
             third_party_pv: int = decode_i32_le(a[4:6])
             # 10006-10007  ac_active_power  i32  (+ X1 delivers AC / - X1 draws AC;
-            # feeds the AC-coupled charge-power correction below and, since
-            # kw44.3, exposed raw as a diagnostic sensor)
+            # feeds the inverter_loss balance below and, since kw44.3, exposed raw
+            # as a diagnostic sensor). Not a power measurement on this firmware:
+            # +418..445 W while charging at 1 kW (test 2026-10-25).
             ac_active_power: int = decode_i32_le(a[6:8])
-            # 10008-10009  battery_power  i32  (+ discharge / - charge)
+            # 10008-10009  battery_power  i32  (+ discharge / - charge). Exposed
+            # raw since kw44.4: the average with ac_active_power is gone (-715 W
+            # at -1000 W on the battery, test 2026-10-25).
             battery_power: int = decode_i32_le(a[8:10])
             # 10010-10011  load_power  i32
             load_power: int = decode_i32_le(a[10:12])
@@ -440,8 +443,7 @@ class AnkerX1Coordinator(DataUpdateCoordinator[dict[str, Any]]):
             # 10078-10079  import_limit_value  u32  (W when mode=2, % when mode=1)
             import_limit_value: int = decode_u32_le(e[18:20])
             # 10071-10072  battery power setpoint  i32  (W, + discharge / - charge)
-            # Read back so a caller can verify a write landed: battery_power is
-            # not a reliable echo while charging on AC-coupled units.
+            # Read back so a caller can verify a write landed.
             battery_setpoint: int = decode_i32_le(e[11:13])
             # 10080  comms watchdog  u16  (seconds)
             watchdog_s: int = decode_u16(e[20])
@@ -520,18 +522,6 @@ class AnkerX1Coordinator(DataUpdateCoordinator[dict[str, Any]]):
             # inverter's post-MPPT harvested total, which reads lower.
             combined_pv_power: int = pv1_power + pv2_power
 
-            # AC-coupled charge-power correction (no DC PV, pv_connected=False):
-            # the firmware under-reports charge power on this topology; the
-            # SoC-calibrated fix is to average it with the independent AC-side
-            # reading (ac_active_power), which tracks true DC charge power more
-            # closely. DC-coupled installs derive battery_power accurately from
-            # the firmware directly, so no correction is applied there.
-            # TODO: remove once Anker fixes the firmware register attribution.
-            if not self.pv_connected and battery_power < 0:  # charging
-                battery_power = -round(
-                    (abs(battery_power) + abs(ac_active_power)) / 2
-                )
-
             # --- Inverter conversion loss --------------------------------
             # DC power crossing the PCS minus useful AC power out. PV and the
             # battery share one converter, so ac_active_power already carries
@@ -540,9 +530,10 @@ class AnkerX1Coordinator(DataUpdateCoordinator[dict[str, Any]]):
             # Validated against 6.5 days of logged data:
             #   - DC-coupled: only observable on discharge (~10% conversion
             #     loss); charge/idle is not exposed by the registers -> 0.
-            #   - AC-coupled: uses the SoC-calibrated charge correction applied
-            #     above; a true loss is only an upper bound here because the
-            #     AC-coupled GoodWe poisons the balance (project note).
+            #   - AC-coupled: a true loss is only an upper bound here because the
+            #     AC-coupled GoodWe poisons the balance (project note). Unusable
+            #     in practice while ac_active_power (10006) measures no power:
+            #     kept as is, do not build on it.
             total_pv: int = pv_power + third_party_pv
             if self.pv_connected:
                 if battery_power > 0:  # discharging (possibly with concurrent PV)

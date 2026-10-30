@@ -201,9 +201,7 @@ diagnostic sensor.
 **Read-back:** the diagnostic sensors **Work Mode State** / **Work Mode Code**
 (`10064`), **Battery Setpoint Readback** (`10071`), **Comms Watchdog** (`10080`)
 and **Last Successful Poll** let an automation verify that a write landed and
-that the link is fresh, without enabling the control entities. On AC-coupled
-units `battery_power` under-reports while charging, so verify a setpoint against
-the read-back, not against the measured power.
+that the link is fresh, without enabling the control entities.
 
 At very low SOC the BMS sits in Standby and won't discharge regardless of
 command.
@@ -230,11 +228,11 @@ command.
   - **DC-coupled** (PV connected): loss is only observable on **discharge**
     (~10% conversion loss, validated against logged data); the registers don't
     expose the charge/idle loss, so it reports **0** while charging or idle.
-  - **AC-coupled** (**PV connected** off): the same balance, plus an SoC-
-    calibrated charge-power correction (this firmware under-reports charge power
-    on that topology), and forced to 0 in Standby/Sleep where the converter is
-    idle. On AC-coupled sites the figure is an upper bound — a neighbouring
-    AC-coupled solar inverter's export can poison the balance.
+  - **AC-coupled** (**PV connected** off): the same balance, forced to 0 in
+    Standby/Sleep where the converter is idle. On AC-coupled sites the figure is
+    an upper bound — a neighbouring AC-coupled solar inverter's export can poison
+    the balance. kw44 fork: `ac_active_power` measures no power on fw 1.0.19.16,
+    so treat this sensor as unusable there.
 
 ## Important: one Modbus client at a time
 
