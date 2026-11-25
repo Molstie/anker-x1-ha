@@ -1,0 +1,23 @@
+# Dependabot voor deze fork van afewyards/anker-x1-ha: geen dependency-updates (de fork volgt upstream),
+# alleen de GitHub Actions in de workflows; wekelijks vrijdag 06:00 (Europe/Amsterdam), geen major-updates.
+# Opzet en besluit: Homelab/opdracht-dependabot-2026-11.md (25 nov 2026).
+version: 2
+updates:
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "friday"
+      time: "06:00"
+      timezone: "Europe/Amsterdam"
+    open-pull-requests-limit: 5
+    groups:
+      actions-security:
+        applies-to: security-updates
+        patterns: ["*"]
+      actions-minor-patch:
+        applies-to: version-updates
+        update-types: ["minor", "patch"]
+    ignore:
+      - dependency-name: "*"
+        update-types: ["version-update:semver-major"]
